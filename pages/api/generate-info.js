@@ -13,6 +13,8 @@ Create a controller with the following specifications:
 import { Configuration, OpenAIApi } from 'openai';
 import dotenv from 'dotenv';
 
+const { recipePrompt } = require('../../data/recipe.json');
+
 dotenv.config();
 
 const configuration = new Configuration({
@@ -23,25 +25,31 @@ const configuration = new Configuration({
 const openai = new OpenAIApi(configuration);
 
 export async function generateInfo(req, res) {
+  const { recipe } = req.body;
   try {
-    const response = await openai.completions.create({
-      engine: 'davinci',
-      prompt: req.body.prompt,
-      maxTokens: 100,
-      temperature: 0.9,
-      topP: 1,
-      presencePenalty: 0,
-      frequencyPenalty: 0,
-      bestOf: 1,
+    const completion = await openai.createChatCompletion({
+      model: "gpt-3.5-turbo",
+      message: [{role: "user", content: `${recipePrompt}${recipe}`}],
+      maxTokens: 200,
       n: 1,
-      stream: false,
-      stop: ['\n']
     });
+    const response = completion.data.choices[0].message.content;
 
-    return res.status(200).json(response.data);
+    return res.status(200).json({
+      success: true,
+      data: response,
+    });
   } catch (error) {
-    return res.status(500).json({ message: error.message });
+    console.log(error);
+    if (error.response.status === 401) {
+      return res.status(401).json({
+        error: "Unauthorized. Please check your API key."
+      });
+    }
+    return res.status(500).json({
+      error: "An error occurred while getting recipe information. Please try again later."
+    });
   }
 }
 
-export default generateInfo;
+module.exports = {generateInfo};
